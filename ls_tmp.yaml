@@ -1,0 +1,33 @@
+allowed_syscalls:
+- +++
+- access
+- arch_prctl
+- brk
+- close
+- execve
+- exit_group
+- getdents64
+- getrandom
+- ioctl
+- mmap
+- mprotect
+- munmap
+- newfstatat
+- openat
+- pread64
+- prlimit64
+- read
+- rseq
+- set_robust_list
+- set_tid_address
+- statfs
+- statx
+- write
+file_access:
+  read:
+  - /etc/ld.so.preload
+  - /etc/selinux/config
+  write: []
+network:
+  allowed: false
+command: ls -F /tmp
