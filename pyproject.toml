@@ -1,0 +1,18 @@
+[project]
+name = "toVerify"
+version = "0.1.0"
+description = "A tool to verify command execution against a behavior profile."
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "PyYAML>=5.4",
+]
+
+[project.scripts]
+toVerify = "toVerify.__main__:main"
+
+[tool.setuptools]
+packages = ["toVerify"]
+
+[project.optional-dependencies]
+dev = ["pytest"]

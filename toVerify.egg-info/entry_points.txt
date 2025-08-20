@@ -1,0 +1,2 @@
+[console_scripts]
+toVerify = toVerify.__main__:main

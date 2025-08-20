@@ -1,0 +1,89 @@
+allowed_syscalls:
+- access
+- arch_prctl
+- brk
+- close
+- execve
+- exit_group
+- futex
+- getdents64
+- getegid
+- geteuid
+- getgid
+- getpid
+- getppid
+- getrandom
+- getuid
+- ioctl
+- mmap
+- mprotect
+- munmap
+- newfstatat
+- openat
+- pread64
+- prlimit64
+- read
+- rseq
+- rt_sigaction
+- rt_sigprocmask
+- rt_sigreturn
+- set_robust_list
+- set_tid_address
+- statfs
+- statx
+- wait4
+- write
+file_access:
+  read:
+  - /etc/ld.so.cache
+  - /etc/ld.so.preload
+  - /etc/selinux/config
+  - /lib/x86_64-linux-gnu/libc.so.6
+  - /lib/x86_64-linux-gnu/libpcre2-8.so.0
+  - /lib/x86_64-linux-gnu/libselinux.so.1
+  - /proc/filesystems
+  - /snap/code/204/usr/lib/locale/en_US.UTF-8/LC_ADDRESS
+  - /snap/code/204/usr/lib/locale/en_US.UTF-8/LC_COLLATE
+  - /snap/code/204/usr/lib/locale/en_US.UTF-8/LC_CTYPE
+  - /snap/code/204/usr/lib/locale/en_US.UTF-8/LC_IDENTIFICATION
+  - /snap/code/204/usr/lib/locale/en_US.UTF-8/LC_MEASUREMENT
+  - /snap/code/204/usr/lib/locale/en_US.UTF-8/LC_MESSAGES
+  - /snap/code/204/usr/lib/locale/en_US.UTF-8/LC_MONETARY
+  - /snap/code/204/usr/lib/locale/en_US.UTF-8/LC_NAME
+  - /snap/code/204/usr/lib/locale/en_US.UTF-8/LC_NUMERIC
+  - /snap/code/204/usr/lib/locale/en_US.UTF-8/LC_PAPER
+  - /snap/code/204/usr/lib/locale/en_US.UTF-8/LC_TELEPHONE
+  - /snap/code/204/usr/lib/locale/en_US.UTF-8/LC_TIME
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_ADDRESS
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_COLLATE
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_CTYPE
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_IDENTIFICATION
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_MEASUREMENT
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_MESSAGES
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_MESSAGES/SYS_LC_MESSAGES
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_MONETARY
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_NAME
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_NUMERIC
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_PAPER
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_TELEPHONE
+  - /snap/code/204/usr/lib/locale/en_US.utf8/LC_TIME
+  - /tmp
+  - /usr/bin/sh
+  - /usr/lib/locale/en_US.UTF-8/LC_ADDRESS
+  - /usr/lib/locale/en_US.UTF-8/LC_COLLATE
+  - /usr/lib/locale/en_US.UTF-8/LC_CTYPE
+  - /usr/lib/locale/en_US.UTF-8/LC_IDENTIFICATION
+  - /usr/lib/locale/en_US.UTF-8/LC_MEASUREMENT
+  - /usr/lib/locale/en_US.UTF-8/LC_MESSAGES
+  - /usr/lib/locale/en_US.UTF-8/LC_MONETARY
+  - /usr/lib/locale/en_US.UTF-8/LC_NAME
+  - /usr/lib/locale/en_US.UTF-8/LC_NUMERIC
+  - /usr/lib/locale/en_US.UTF-8/LC_PAPER
+  - /usr/lib/locale/en_US.UTF-8/LC_TELEPHONE
+  - /usr/lib/locale/en_US.UTF-8/LC_TIME
+  - /usr/lib/x86_64-linux-gnu/gconv/gconv-modules.cache
+  - /usr/share/locale/locale.alias
+  write: []
+network:
+  allowed: false
+command: ls -F /tmp
