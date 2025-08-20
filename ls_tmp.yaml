@@ -1,5 +1,4 @@
 allowed_syscalls:
-- +++
 - access
 - arch_prctl
 - brk
@@ -7,7 +6,13 @@ allowed_syscalls:
 - execve
 - exit_group
 - getdents64
+- getegid
+- geteuid
+- getgid
+- getpid
+- getppid
 - getrandom
+- getuid
 - ioctl
 - mmap
 - mprotect
@@ -18,15 +23,22 @@ allowed_syscalls:
 - prlimit64
 - read
 - rseq
+- rt_sigaction
+- rt_sigprocmask
+- rt_sigreturn
 - set_robust_list
 - set_tid_address
 - statfs
 - statx
+- vfork
+- wait4
 - write
 file_access:
   read:
-  - /etc/ld.so.preload
+  - /etc/ld.so.*
   - /etc/selinux/config
+  - /usr/bin/ls
+  - /usr/bin/sh
   write: []
 network:
   allowed: false

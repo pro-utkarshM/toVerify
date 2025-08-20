@@ -16,39 +16,60 @@ def run_command_with_strace(command):
 
 def parse_strace_output(strace_output):
     """
-    A simple parser for strace output to extract syscalls and file access.
-    This is a basic implementation and can be improved.
+    Parses strace output using regular expressions to be more robust.
     """
+    import re
+
+    # Regex to capture the syscall name from a line like:
+    # 12345 syscall_name(arg1, arg2) = 0
+    # It avoids matching lines without parentheses, like signal deliveries.
+    syscall_regex = re.compile(r'^\d+\s+([a-zA-Z0-9_]+)\(.*')
+
+    # Regex to find file paths in arguments, typically the first quoted string.
+    # e.g., openat(AT_FDCWD, "/path/to/file", O_RDONLY) = 3
+    path_regex = re.compile(r'\((?P<quote>[""])(?P<path>.*?)(?P=quote)')
+
     syscalls = set()
     read_files = set()
     write_files = set()
 
+    # Syscalls that are known to read from a path argument.
+    read_syscalls = {"access", "openat", "stat", "lstat", "readlink", "execve"}
+    # Syscalls that are known to write, but need flag checking.
+    write_syscalls = {"openat", "renameat", "symlinkat"}
+
+
     for line in strace_output.strip().split('\n'):
-        try:
-            # The syscall name is the word immediately before the first "("
-            syscall_name_part = line.split('(', 1)[0]
-            # This part might contain a PID and other info, so we take the last word.
-            syscall_name = syscall_name_part.strip().split()[-1]
-            syscalls.add(syscall_name)
+        syscall_match = syscall_regex.match(line)
+        if not syscall_match:
+            continue
 
-            # Heuristic for file paths
-            if '("' in line:
-                path = line.split('"')[1]
-                
-                # Check for read-related flags/syscalls
-                if syscall_name in ["read", "access", "openat", "stat", "lstat"]:
+        syscall_name = syscall_match.group(1)
+        syscalls.add(syscall_name)
+
+        path_match = path_regex.search(line)
+        if not path_match:
+            continue
+
+        path = path_match.group("path")
+
+        # Determine if it's a read or write operation
+        if syscall_name in read_syscalls:
+            # For openat, we need to check flags to be more precise
+            if syscall_name == "openat":
+                if "O_WRONLY" in line:
+                    write_files.add(path)
+                elif "O_RDWR" in line:
                     read_files.add(path)
-                elif "O_RDONLY" in line or "O_RDWR" in line:
+                    write_files.add(path)
+                else: # Default to read for O_RDONLY or no flags specified
                     read_files.add(path)
+            else:
+                read_files.add(path)
 
-                # Check for write-related flags/syscalls
-                if syscall_name in ["write", "openat"]:
-                    if "O_WRONLY" in line or "O_RDWR" in line or "O_CREAT" in line:
-                        write_files.add(path)
-
-        except IndexError:
-            # Line format might not be as expected, skip for now.
-            pass
+        if syscall_name in write_syscalls:
+             if "O_WRONLY" in line or "O_RDWR" in line or "O_CREAT" in line:
+                write_files.add(path)
 
     return {
         "allowed_syscalls": sorted(list(syscalls)),
@@ -60,6 +81,7 @@ def parse_strace_output(strace_output):
             "allowed": False # Default to false, can be updated based on syscalls like socket, connect
         }
     }
+
 
 def do_profile(command, output_file):
     """Profiles a command and saves the behavior to a YAML file."""
@@ -79,6 +101,9 @@ def do_profile(command, output_file):
         yaml.dump(profile_data, f, default_flow_style=False, sort_keys=False)
     
     print("Profiling complete.")
+
+import fnmatch
+
 
 def do_verify(profile_file, command):
     """Verifies a command against a profile."""
@@ -113,27 +138,38 @@ def do_verify(profile_file, command):
     allowed_syscalls = set(expected_profile["allowed_syscalls"])
     disallowed_syscalls = observed_syscalls - allowed_syscalls
     if disallowed_syscalls:
-        deviations.append(f"Disallowed system calls executed: {sorted(list(disallowed_syscalls))}")
+        deviations.append(("Disallowed system calls executed", sorted(list(disallowed_syscalls))))
 
-    # Check file reads
-    observed_reads = set(observed_profile["file_access"]["read"])
-    allowed_reads = set(expected_profile["file_access"]["read"])
-    forbidden_reads = observed_reads - allowed_reads
+    # Check file access with glob support
+    def check_file_access(observed_paths, allowed_patterns):
+        forbidden = []
+        for path in observed_paths:
+            if not any(fnmatch.fnmatch(path, pattern) for pattern in allowed_patterns):
+                forbidden.append(path)
+        return forbidden
+
+    forbidden_reads = check_file_access(
+        observed_profile["file_access"]["read"],
+        expected_profile["file_access"]["read"]
+    )
     if forbidden_reads:
-        deviations.append(f"Forbidden files read: {sorted(list(forbidden_reads))}")
+        deviations.append(("Forbidden files read", sorted(forbidden_reads)))
 
-    # Check file writes
-    observed_writes = set(observed_profile["file_access"]["write"])
-    allowed_writes = set(expected_profile["file_access"]["write"])
-    forbidden_writes = observed_writes - allowed_writes
+    forbidden_writes = check_file_access(
+        observed_profile["file_access"]["write"],
+        expected_profile["file_access"]["write"]
+    )
     if forbidden_writes:
-        deviations.append(f"Forbidden files written to: {sorted(list(forbidden_writes))}")
+        deviations.append(("Forbidden files written to", sorted(forbidden_writes)))
+
 
     if deviations:
         print("\n--- VERIFICATION FAILED ---", file=sys.stderr)
         print(f"Command \"{command}\" deviated from profile \"{profile_file}\"\n", file=sys.stderr)
-        for dev in deviations:
-            print(f"- {dev}", file=sys.stderr)
+        for category, items in deviations:
+            print(f"  - {category}:", file=sys.stderr)
+            for item in items:
+                print(f"    - {item}", file=sys.stderr)
         print("\n---------------------------", file=sys.stderr)
         sys.exit(1)
     else:
