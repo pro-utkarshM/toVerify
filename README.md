@@ -8,13 +8,13 @@ A simple, powerful tool to ensure that a command-line program does exactly what 
 
 ## Features
 
-- 🔍 **Profile Mode**: Capture a command's syscalls, file access, and network activity
-- ✅ **Verify Mode**: Enforce behavior profiles in real-time, terminate on violation
-- 🧠 **Learning Mode**: Run N times and merge for stable profiles (reduces false positives)
-- 📊 **Diff Profiles**: Compare two profiles and see exactly what changed
-- 🔗 **Profile Inheritance**: Use `extends:` to inherit from base profiles
-- 🔎 **Validation**: Check profile syntax without running commands
-- 🔇 **Verbosity Control**: `--verbose` for debugging, `--quiet` for scripts
+- **Profile Mode**: Capture a command's syscalls, file access, and network activity
+- **Verify Mode**: Enforce behavior profiles in real-time, terminate on violation
+- **Learning Mode**: Run N times and merge for stable profiles (reduces false positives)
+- **Diff Profiles**: Compare two profiles and see exactly what changed
+- **Profile Inheritance**: Use `extends:` to inherit from base profiles
+- **Validation**: Check profile syntax without running commands
+- **Verbosity Control**: `--verbose` for debugging, `--quiet` for scripts
 
 ## Installation
 
