@@ -2,6 +2,7 @@
 
 import yaml
 import sys
+import os
 
 from .core import ProfileError
 
@@ -10,24 +11,105 @@ REQUIRED_FIELDS = ["allowed_syscalls", "file_access", "network"]
 REQUIRED_FILE_ACCESS_FIELDS = ["read", "write"]
 
 
-def load_profile(filepath):
+def _resolve_profile_path(extends_path, current_file):
+    """Resolve an extends path relative to the current profile file.
+    
+    Args:
+        extends_path: The path from the extends field
+        current_file: Path to the profile that contains the extends
+        
+    Returns:
+        Absolute path to the parent profile
+    """
+    if os.path.isabs(extends_path):
+        return extends_path
+    
+    # Resolve relative to the directory containing the current profile
+    base_dir = os.path.dirname(os.path.abspath(current_file))
+    return os.path.join(base_dir, extends_path)
+
+
+def _merge_into_parent(parent, child):
+    """Merge child profile additions into parent profile.
+    
+    Uses union strategy: child additions are added to parent's sets.
+    
+    Args:
+        parent: Parent profile dictionary
+        child: Child profile dictionary
+        
+    Returns:
+        Merged profile dictionary
+    """
+    merged = {
+        "allowed_syscalls": list(set(parent.get("allowed_syscalls", [])) | 
+                                  set(child.get("allowed_syscalls", []))),
+        "file_access": {
+            "read": list(set(parent.get("file_access", {}).get("read", [])) |
+                         set(child.get("file_access", {}).get("read", []))),
+            "write": list(set(parent.get("file_access", {}).get("write", [])) |
+                          set(child.get("file_access", {}).get("write", []))),
+        },
+        "network": {
+            # Child can enable network if parent didn't have it
+            "allowed": (parent.get("network", {}).get("allowed", False) or
+                        child.get("network", {}).get("allowed", False))
+        }
+    }
+    
+    # Copy over any other fields from child (command, metadata, etc.)
+    for key in child:
+        if key not in ["allowed_syscalls", "file_access", "network", "extends"]:
+            merged[key] = child[key]
+    
+    return merged
+
+
+def load_profile(filepath, _visited=None):
     """Load and validate a profile from a YAML file.
+    
+    Supports profile inheritance via the 'extends' field.
     
     Args:
         filepath: Path to the YAML profile file
+        _visited: Internal set to detect circular inheritance
         
     Returns:
-        The validated profile dictionary
+        The validated (and merged if extends is used) profile dictionary
         
     Raises:
-        ProfileError: If the profile is invalid
+        ProfileError: If the profile is invalid or circular inheritance detected
         FileNotFoundError: If the file doesn't exist
     """
+    # Detect circular inheritance
+    if _visited is None:
+        _visited = set()
+    
+    abs_path = os.path.abspath(filepath)
+    if abs_path in _visited:
+        raise ProfileError(f"Circular inheritance detected: {filepath}")
+    _visited.add(abs_path)
+    
     try:
         with open(filepath, 'r') as f:
             profile = yaml.safe_load(f)
     except yaml.YAMLError as e:
         raise ProfileError(f"Could not parse YAML: {e}")
+    
+    if profile is None:
+        raise ProfileError(f"Profile '{filepath}' is empty or invalid YAML")
+    
+    # Handle inheritance
+    if "extends" in profile:
+        parent_path = _resolve_profile_path(profile["extends"], filepath)
+        try:
+            parent_profile = load_profile(parent_path, _visited)
+        except FileNotFoundError:
+            raise ProfileError(f"Parent profile not found: {profile['extends']} "
+                               f"(resolved to {parent_path})")
+        
+        # Merge child into parent
+        profile = _merge_into_parent(parent_profile, profile)
     
     validate_profile(profile, filepath)
     return profile
