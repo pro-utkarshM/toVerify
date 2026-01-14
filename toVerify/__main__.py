@@ -4,6 +4,7 @@ import argparse
 import sys
 
 from .core import do_profile, do_verify, StraceNotFoundError, ProfileError
+from .profile import do_validate
 
 
 def main():
@@ -25,6 +26,10 @@ def main():
     mode_group.add_argument(
         "--verify", metavar="PROFILE_FILE",
         help="Verify a command against a behavior profile."
+    )
+    mode_group.add_argument(
+        "--validate", metavar="PROFILE_FILE",
+        help="Validate a profile's syntax and structure."
     )
     
     # Output options
@@ -86,6 +91,11 @@ def main():
                 args.command,
                 verbosity=verbosity,
                 dry_run=args.dry_run
+            )
+        elif args.validate:
+            do_validate(
+                args.validate,
+                verbosity=verbosity
             )
     except StraceNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
