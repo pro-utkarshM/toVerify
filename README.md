@@ -1,5 +1,5 @@
 # toVerify - Trust, but Verify Your Commands
-
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-pro--utkarshM%2FtoVerify-blue.svg)](https://deepwiki.com/pro-utkarshM/toVerify)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/tests-41%20passed-brightgreen.svg)]()
