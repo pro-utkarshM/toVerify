@@ -4,7 +4,7 @@ import argparse
 import sys
 
 from .core import do_profile, do_verify, StraceNotFoundError, ProfileError
-from .profile import do_validate
+from .profile import do_validate, do_diff
 
 
 def main():
@@ -30,6 +30,10 @@ def main():
     mode_group.add_argument(
         "--validate", metavar="PROFILE_FILE",
         help="Validate a profile's syntax and structure."
+    )
+    mode_group.add_argument(
+        "--diff", nargs=2, metavar=("PROFILE1", "PROFILE2"),
+        help="Compare two profiles and show differences."
     )
     
     # Output options
@@ -95,6 +99,12 @@ def main():
         elif args.validate:
             do_validate(
                 args.validate,
+                verbosity=verbosity
+            )
+        elif args.diff:
+            do_diff(
+                args.diff[0],
+                args.diff[1],
                 verbosity=verbosity
             )
     except StraceNotFoundError as e:

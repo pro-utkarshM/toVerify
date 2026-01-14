@@ -131,3 +131,131 @@ def do_validate(profile_file, verbosity=1):
         print(get_profile_summary(profile))
     
     return True
+
+
+def diff_profiles(profile1, profile2):
+    """Compare two profiles and return the differences.
+    
+    Args:
+        profile1: First profile dictionary
+        profile2: Second profile dictionary
+        
+    Returns:
+        Dictionary containing:
+        - syscalls_added: syscalls in profile2 but not profile1
+        - syscalls_removed: syscalls in profile1 but not profile2
+        - read_added: read patterns added
+        - read_removed: read patterns removed
+        - write_added: write patterns added
+        - write_removed: write patterns removed
+        - network_changed: True if network.allowed differs
+    """
+    syscalls1 = set(profile1.get("allowed_syscalls", []))
+    syscalls2 = set(profile2.get("allowed_syscalls", []))
+    
+    file1 = profile1.get("file_access", {})
+    file2 = profile2.get("file_access", {})
+    
+    read1 = set(file1.get("read", []))
+    read2 = set(file2.get("read", []))
+    write1 = set(file1.get("write", []))
+    write2 = set(file2.get("write", []))
+    
+    net1 = profile1.get("network", {}).get("allowed", False)
+    net2 = profile2.get("network", {}).get("allowed", False)
+    
+    return {
+        "syscalls_added": sorted(syscalls2 - syscalls1),
+        "syscalls_removed": sorted(syscalls1 - syscalls2),
+        "read_added": sorted(read2 - read1),
+        "read_removed": sorted(read1 - read2),
+        "write_added": sorted(write2 - write1),
+        "write_removed": sorted(write1 - write2),
+        "network_changed": net1 != net2,
+        "network_old": net1,
+        "network_new": net2
+    }
+
+
+def do_diff(profile_file1, profile_file2, verbosity=1):
+    """Compare two profiles and display the differences.
+    
+    Args:
+        profile_file1: Path to first profile
+        profile_file2: Path to second profile
+        verbosity: Output level (0=quiet, 1=normal, 2=verbose)
+    """
+    if verbosity >= 1:
+        print(f"Comparing profiles:")
+        print(f"  Base:   {profile_file1}")
+        print(f"  Target: {profile_file2}")
+    
+    try:
+        profile1 = load_profile(profile_file1)
+        profile2 = load_profile(profile_file2)
+    except FileNotFoundError as e:
+        print(f"Error: Profile not found: {e}", file=sys.stderr)
+        sys.exit(1)
+    except ProfileError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    diff = diff_profiles(profile1, profile2)
+    
+    has_changes = False
+    
+    # Syscall changes
+    if diff["syscalls_added"]:
+        has_changes = True
+        print(f"\n+ Syscalls added ({len(diff['syscalls_added'])}):")
+        for s in diff["syscalls_added"]:
+            print(f"    + {s}")
+    
+    if diff["syscalls_removed"]:
+        has_changes = True
+        print(f"\n- Syscalls removed ({len(diff['syscalls_removed'])}):")
+        for s in diff["syscalls_removed"]:
+            print(f"    - {s}")
+    
+    # Read pattern changes
+    if diff["read_added"]:
+        has_changes = True
+        print(f"\n+ Read patterns added ({len(diff['read_added'])}):")
+        for p in diff["read_added"]:
+            print(f"    + {p}")
+    
+    if diff["read_removed"]:
+        has_changes = True
+        print(f"\n- Read patterns removed ({len(diff['read_removed'])}):")
+        for p in diff["read_removed"]:
+            print(f"    - {p}")
+    
+    # Write pattern changes
+    if diff["write_added"]:
+        has_changes = True
+        print(f"\n+ Write patterns added ({len(diff['write_added'])}):")
+        for p in diff["write_added"]:
+            print(f"    + {p}")
+    
+    if diff["write_removed"]:
+        has_changes = True
+        print(f"\n- Write patterns removed ({len(diff['write_removed'])}):")
+        for p in diff["write_removed"]:
+            print(f"    - {p}")
+    
+    # Network changes
+    if diff["network_changed"]:
+        has_changes = True
+        old = "allowed" if diff["network_old"] else "blocked"
+        new = "allowed" if diff["network_new"] else "blocked"
+        print(f"\n! Network access changed: {old} -> {new}")
+    
+    if not has_changes:
+        print("\nProfiles are identical.")
+    else:
+        print("\n---")
+        total = (len(diff["syscalls_added"]) + len(diff["syscalls_removed"]) +
+                 len(diff["read_added"]) + len(diff["read_removed"]) +
+                 len(diff["write_added"]) + len(diff["write_removed"]) +
+                 (1 if diff["network_changed"] else 0))
+        print(f"Total changes: {total}")
