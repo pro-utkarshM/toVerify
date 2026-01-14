@@ -144,13 +144,14 @@ def check_violation(details, profile):
 
     return None
 
-def do_verify(profile_file, command, verbosity=1):
+def do_verify(profile_file, command, verbosity=1, dry_run=False):
     """Verifies a command against a profile in real-time.
     
     Args:
         profile_file: Path to the YAML behavior profile
         command: The shell command to verify
         verbosity: Output level (0=quiet, 1=normal, 2=verbose)
+        dry_run: If True, report all violations without terminating
     
     Raises:
         StraceNotFoundError: If strace is not installed
@@ -160,6 +161,8 @@ def do_verify(profile_file, command, verbosity=1):
     
     if verbosity >= 1:
         print(f"Verifying command: \"{command}\" against profile: {profile_file}")
+        if dry_run:
+            print("Mode: DRY RUN (will report all violations without terminating)")
     
     # 1. Load the profile
     try:
@@ -204,6 +207,8 @@ def do_verify(profile_file, command, verbosity=1):
 
     # 3. Process strace output line by line
     syscall_count = 0
+    violations = []  # Collect violations for dry-run mode
+    
     try:
         for line in iter(proc.stderr.readline, ''):
             parsed_details = parse_strace_line(line)
@@ -218,15 +223,24 @@ def do_verify(profile_file, command, verbosity=1):
             violation = check_violation(parsed_details, profile)
             
             if violation:
-                print("\n--- VERIFICATION FAILED ---", file=sys.stderr)
-                print(f"CRITICAL: Deviation detected for command \"{command}\"!", file=sys.stderr)
-                print(f"Violation: {violation}", file=sys.stderr)
-                print(f"Offending line: {line.strip()}", file=sys.stderr)
-                print("Terminating process group...", file=sys.stderr)
-                
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                proc.wait()
-                sys.exit(1)
+                if dry_run:
+                    # In dry-run mode, collect violations and continue
+                    violations.append({
+                        "violation": violation,
+                        "line": line.strip()
+                    })
+                    print(f"VIOLATION: {violation}", file=sys.stderr)
+                else:
+                    # In normal mode, terminate immediately
+                    print("\n--- VERIFICATION FAILED ---", file=sys.stderr)
+                    print(f"CRITICAL: Deviation detected for command \"{command}\"!", file=sys.stderr)
+                    print(f"Violation: {violation}", file=sys.stderr)
+                    print(f"Offending line: {line.strip()}", file=sys.stderr)
+                    print("Terminating process group...", file=sys.stderr)
+                    
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    proc.wait()
+                    sys.exit(1)
 
     except KeyboardInterrupt:
         print("\nInterrupted by user. Terminating process.", file=sys.stderr)
@@ -237,14 +251,26 @@ def do_verify(profile_file, command, verbosity=1):
     proc.stderr.close()
     return_code = proc.wait()
 
-    if return_code == 0:
-        if verbosity >= 1:
-            print("\n--- VERIFICATION SUCCESSFUL ---")
-            print(f"Command \"{command}\" adheres to profile \"{profile_file}\".")
-        if verbosity >= 2:
-            print(f"Total syscalls checked: {syscall_count}")
+    # Report results
+    if dry_run:
+        print(f"\n--- DRY RUN COMPLETE ---")
+        if violations:
+            print(f"Found {len(violations)} violation(s):", file=sys.stderr)
+            for i, v in enumerate(violations, 1):
+                print(f"  {i}. {v['violation']}", file=sys.stderr)
+            sys.exit(len(violations))  # Exit with violation count
+        else:
+            if verbosity >= 1:
+                print(f"Command \"{command}\" adheres to profile \"{profile_file}\".")
     else:
-        if verbosity >= 1:
-            print(f"\n--- COMMAND FINISHED WITH NON-ZERO EXIT CODE: {return_code} ---")
-        # Exit with the same code so scripts can detect failure
-        sys.exit(return_code)
+        if return_code == 0:
+            if verbosity >= 1:
+                print("\n--- VERIFICATION SUCCESSFUL ---")
+                print(f"Command \"{command}\" adheres to profile \"{profile_file}\".")
+            if verbosity >= 2:
+                print(f"Total syscalls checked: {syscall_count}")
+        else:
+            if verbosity >= 1:
+                print(f"\n--- COMMAND FINISHED WITH NON-ZERO EXIT CODE: {return_code} ---")
+            # Exit with the same code so scripts can detect failure
+            sys.exit(return_code)

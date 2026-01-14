@@ -51,6 +51,12 @@ def main():
         "--quiet", "-q", action="store_true",
         help="Suppress all output except errors and violations."
     )
+    
+    # Verification options
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Report all violations without terminating the process (used with --verify)."
+    )
 
     args = parser.parse_args()
     
@@ -78,7 +84,8 @@ def main():
             do_verify(
                 args.verify,
                 args.command,
-                verbosity=verbosity
+                verbosity=verbosity,
+                dry_run=args.dry_run
             )
     except StraceNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
