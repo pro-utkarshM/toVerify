@@ -12,13 +12,22 @@ LINE_REGEX = re.compile(
 PATH_REGEX = re.compile(r'"(?P<path>[^"]+)"')
 
 # Syscalls known to be related to network operations
-NETWORK_SYSCALLS = {"socket", "connect", "bind", "accept", "sendto", "recvfrom"}
+NETWORK_SYSCALLS = {
+    "socket", "connect", "bind", "accept", "accept4", "sendto", "recvfrom",
+    "listen", "getpeername", "getsockname", "setsockopt", "getsockopt",
+    "sendmsg", "recvmsg", "shutdown"
+}
 
 # Syscalls known to take a file path as one of their primary arguments.
 # This is the key to fixing the bug.
 PATH_SYSCALLS = {
-    "access", "stat", "lstat", "readlink", "execve", "openat",
-    "renameat", "symlinkat", "mkdirat", "unlinkat", "statfs", "statx"
+    "access", "faccessat", "faccessat2",
+    "stat", "lstat", "fstatat", "newfstatat", "statx",
+    "readlink", "readlinkat",
+    "execve", "execveat",
+    "openat", "openat2",
+    "renameat", "renameat2", "symlinkat", "mkdirat", "unlinkat",
+    "statfs", "fchmodat", "fchownat", "linkat", "utimensat"
 }
 
 def parse_strace_line(line):
@@ -52,19 +61,29 @@ def parse_strace_line(line):
                 details["path"] = path
 
     # Check for read operations
-    read_syscalls = {"access", "stat", "lstat", "readlink", "execve", "openat"}
+    read_syscalls = {
+        "access", "faccessat", "faccessat2",
+        "stat", "lstat", "fstatat", "newfstatat", "statx",
+        "readlink", "readlinkat",
+        "execve", "execveat",
+        "openat", "openat2"
+    }
     if syscall in read_syscalls:
-        # For openat, be more specific
-        if syscall == "openat":
+        # For openat/openat2, be more specific
+        if syscall in ("openat", "openat2"):
             if "O_WRONLY" not in args:  # O_RDONLY or O_RDWR are reads
                 details["is_read"] = True
         else:
             details["is_read"] = True
             
     # Check for write operations
-    write_syscalls = {"openat", "renameat", "symlinkat", "mkdirat", "unlinkat"}
+    write_syscalls = {
+        "openat", "openat2",
+        "renameat", "renameat2", "symlinkat", "mkdirat", "unlinkat",
+        "fchmodat", "fchownat", "linkat", "utimensat"
+    }
     if syscall in write_syscalls:
-        if syscall == "openat":
+        if syscall in ("openat", "openat2"):
             if "O_WRONLY" in args or "O_RDWR" in args or "O_CREAT" in args:
                 details["is_write"] = True
         else:
