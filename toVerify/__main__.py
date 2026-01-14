@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from .core import do_profile, do_verify, StraceNotFoundError, ProfileError
+from .core import do_profile, do_profile_learn, do_verify, StraceNotFoundError, ProfileError
 from .profile import do_validate, do_diff
 
 
@@ -49,6 +49,10 @@ def main():
         "--timeout", "-t", metavar="SECONDS", type=int,
         help="Timeout in seconds for command execution (default: 300)."
     )
+    parser.add_argument(
+        "--learn", "-l", metavar="N", type=int,
+        help="Run command N times and merge profiles (reduces false positives)."
+    )
     
     # Verbosity options
     verbosity_group = parser.add_mutually_exclusive_group()
@@ -81,12 +85,24 @@ def main():
         if args.profile:
             if not args.output_file:
                 parser.error("--output-file is required when using --profile.")
-            do_profile(
-                args.profile,
-                args.output_file,
-                timeout=args.timeout,
-                verbosity=verbosity
-            )
+            
+            if args.learn:
+                # Learning mode: run N times and merge
+                do_profile_learn(
+                    args.profile,
+                    args.output_file,
+                    n=args.learn,
+                    timeout=args.timeout,
+                    verbosity=verbosity
+                )
+            else:
+                # Normal single-run profiling
+                do_profile(
+                    args.profile,
+                    args.output_file,
+                    timeout=args.timeout,
+                    verbosity=verbosity
+                )
         elif args.verify:
             if not args.command:
                 parser.error("--command is required when using --verify.")

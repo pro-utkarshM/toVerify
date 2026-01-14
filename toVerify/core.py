@@ -115,6 +115,147 @@ def do_profile(command, output_file, timeout=None, verbosity=1):
         print("Profiling complete.")
 
 
+def _run_single_profile(command, timeout):
+    """Run a single profiling pass and return the parsed output.
+    
+    Args:
+        command: The shell command to profile
+        timeout: Maximum seconds to run
+        
+    Returns:
+        Parsed strace output dictionary, or None on failure
+    """
+    strace_command = ["strace", "-f", "sh", "-c", command]
+    
+    try:
+        result = subprocess.run(
+            strace_command, 
+            capture_output=True, 
+            text=True, 
+            check=False,
+            timeout=timeout
+        )
+        strace_output = result.stderr
+    except subprocess.TimeoutExpired:
+        return None
+    
+    if not strace_output:
+        return None
+    
+    return parse_strace_output(strace_output)
+
+
+def _merge_profiles(profiles):
+    """Merge multiple profile dictionaries into one.
+    
+    Uses union of all syscalls, file patterns, and network permissions.
+    This creates a stable profile that reduces false positives.
+    
+    Args:
+        profiles: List of profile dictionaries
+        
+    Returns:
+        Merged profile dictionary
+    """
+    if not profiles:
+        return None
+    
+    all_syscalls = set()
+    all_read = set()
+    all_write = set()
+    any_network = False
+    
+    for p in profiles:
+        all_syscalls.update(p.get("allowed_syscalls", []))
+        all_read.update(p.get("file_access", {}).get("read", []))
+        all_write.update(p.get("file_access", {}).get("write", []))
+        if p.get("network", {}).get("allowed"):
+            any_network = True
+    
+    return {
+        "allowed_syscalls": sorted(all_syscalls),
+        "file_access": {
+            "read": sorted(all_read),
+            "write": sorted(all_write),
+        },
+        "network": {
+            "allowed": any_network
+        }
+    }
+
+
+def do_profile_learn(command, output_file, n=5, timeout=None, verbosity=1):
+    """Profile a command multiple times and merge results for stability.
+    
+    This mode helps reduce false positives caused by ASLR, locale variations,
+    and other non-deterministic behavior.
+    
+    Args:
+        command: The shell command to profile
+        output_file: Path to save the merged YAML profile
+        n: Number of times to run the command (default: 5)
+        timeout: Maximum seconds per run (default: DEFAULT_TIMEOUT)
+        verbosity: Output level (0=quiet, 1=normal, 2=verbose)
+    
+    Raises:
+        StraceNotFoundError: If strace is not installed
+    """
+    _ensure_strace_available()
+    
+    if timeout is None:
+        timeout = DEFAULT_TIMEOUT
+    
+    if verbosity >= 1:
+        print(f"Learning mode: profiling command {n} times")
+        print(f"Command: \"{command}\"")
+    
+    profiles = []
+    for i in range(n):
+        if verbosity >= 1:
+            print(f"  Run {i + 1}/{n}...", end=" ", flush=True)
+        
+        profile = _run_single_profile(command, timeout)
+        
+        if profile:
+            profiles.append(profile)
+            if verbosity >= 1:
+                print(f"OK ({len(profile['allowed_syscalls'])} syscalls)")
+            if verbosity >= 2:
+                print(f"    Read: {len(profile['file_access']['read'])}, "
+                      f"Write: {len(profile['file_access']['write'])}")
+        else:
+            if verbosity >= 1:
+                print("FAILED (skipped)")
+    
+    if not profiles:
+        print("Error: All profiling runs failed.", file=sys.stderr)
+        sys.exit(1)
+    
+    if verbosity >= 1:
+        print(f"\nMerging {len(profiles)} successful profiles...")
+    
+    merged = _merge_profiles(profiles)
+    merged['command'] = command
+    merged['metadata'] = {
+        'learn_runs': n,
+        'successful_runs': len(profiles)
+    }
+    
+    if verbosity >= 2:
+        print(f"Merged profile: {len(merged['allowed_syscalls'])} syscalls")
+        print(f"Read patterns: {len(merged['file_access']['read'])}")
+        print(f"Write patterns: {len(merged['file_access']['write'])}")
+    
+    if verbosity >= 1:
+        print(f"Saving profile to {output_file}...")
+    
+    with open(output_file, 'w') as f:
+        yaml.dump(merged, f, default_flow_style=False, sort_keys=False)
+    
+    if verbosity >= 1:
+        print("Learning complete.")
+
+
 def check_violation(details, profile):
     """Checks a single parsed line for violations against the profile."""
     if not details:
