@@ -48,13 +48,14 @@ def _validate_profile_structure(profile, profile_file):
         raise ProfileError(f"Profile '{profile_file}' missing 'network.allowed' field")
 
 
-def do_profile(command, output_file, timeout=None):
+def do_profile(command, output_file, timeout=None, verbosity=1):
     """Profiles a command and saves the behavior to a YAML file.
     
     Args:
         command: The shell command to profile
         output_file: Path to save the YAML profile
         timeout: Maximum seconds to run (default: DEFAULT_TIMEOUT)
+        verbosity: Output level (0=quiet, 1=normal, 2=verbose)
     
     Raises:
         StraceNotFoundError: If strace is not installed
@@ -64,8 +65,10 @@ def do_profile(command, output_file, timeout=None):
     if timeout is None:
         timeout = DEFAULT_TIMEOUT
     
-    print(f"Profiling command: \"{command}\"")
-    print(f"Timeout: {timeout} seconds")
+    if verbosity >= 1:
+        print(f"Profiling command: \"{command}\"")
+    if verbosity >= 2:
+        print(f"Timeout: {timeout} seconds")
     
     # Use ["sh", "-c", command] to correctly trace compound commands.
     # -f follows forks, crucial for shell scripts.
@@ -96,12 +99,20 @@ def do_profile(command, output_file, timeout=None):
 
     profile_data = parse_strace_output(strace_output)
     profile_data['command'] = command
+    
+    if verbosity >= 2:
+        print(f"Captured {len(profile_data['allowed_syscalls'])} unique syscalls")
+        print(f"Read files: {len(profile_data['file_access']['read'])}")
+        print(f"Write files: {len(profile_data['file_access']['write'])}")
 
-    print(f"Saving profile to {output_file}...")
+    if verbosity >= 1:
+        print(f"Saving profile to {output_file}...")
+    
     with open(output_file, 'w') as f:
         yaml.dump(profile_data, f, default_flow_style=False, sort_keys=False)
     
-    print("Profiling complete.")
+    if verbosity >= 1:
+        print("Profiling complete.")
 
 
 def check_violation(details, profile):
@@ -133,12 +144,13 @@ def check_violation(details, profile):
 
     return None
 
-def do_verify(profile_file, command):
+def do_verify(profile_file, command, verbosity=1):
     """Verifies a command against a profile in real-time.
     
     Args:
         profile_file: Path to the YAML behavior profile
         command: The shell command to verify
+        verbosity: Output level (0=quiet, 1=normal, 2=verbose)
     
     Raises:
         StraceNotFoundError: If strace is not installed
@@ -146,7 +158,8 @@ def do_verify(profile_file, command):
     """
     _ensure_strace_available()
     
-    print(f"Verifying command: \"{command}\" against profile: {profile_file}")
+    if verbosity >= 1:
+        print(f"Verifying command: \"{command}\" against profile: {profile_file}")
     
     # 1. Load the profile
     try:
@@ -168,6 +181,10 @@ def do_verify(profile_file, command):
     
     # Convert to sets for faster lookups
     profile["allowed_syscalls"] = set(profile["allowed_syscalls"])
+    
+    if verbosity >= 2:
+        print(f"Profile loaded: {len(profile['allowed_syscalls'])} allowed syscalls")
+        print(f"Network access: {'allowed' if profile['network']['allowed'] else 'blocked'}")
 
     # 2. Start the command with strace as a subprocess
     # We use -f to follow forks. preexec_fn=os.setsid creates a new process
@@ -182,12 +199,22 @@ def do_verify(profile_file, command):
         preexec_fn=os.setsid
     )
 
-    print(f"Monitoring process group with PGID: {proc.pid}")
+    if verbosity >= 2:
+        print(f"Monitoring process group with PGID: {proc.pid}")
 
     # 3. Process strace output line by line
+    syscall_count = 0
     try:
         for line in iter(proc.stderr.readline, ''):
             parsed_details = parse_strace_line(line)
+            
+            if parsed_details and verbosity >= 2:
+                syscall_count += 1
+                print(f"  [{syscall_count}] {parsed_details['syscall']}", end="")
+                if parsed_details['path']:
+                    print(f" -> {parsed_details['path']}", end="")
+                print()
+            
             violation = check_violation(parsed_details, profile)
             
             if violation:
@@ -211,9 +238,13 @@ def do_verify(profile_file, command):
     return_code = proc.wait()
 
     if return_code == 0:
-        print("\n--- VERIFICATION SUCCESSFUL ---")
-        print(f"Command \"{command}\" adheres to profile \"{profile_file}\".")
+        if verbosity >= 1:
+            print("\n--- VERIFICATION SUCCESSFUL ---")
+            print(f"Command \"{command}\" adheres to profile \"{profile_file}\".")
+        if verbosity >= 2:
+            print(f"Total syscalls checked: {syscall_count}")
     else:
-        print(f"\n--- COMMAND FINISHED WITH NON-ZERO EXIT CODE: {return_code} ---")
+        if verbosity >= 1:
+            print(f"\n--- COMMAND FINISHED WITH NON-ZERO EXIT CODE: {return_code} ---")
         # Exit with the same code so scripts can detect failure
         sys.exit(return_code)
