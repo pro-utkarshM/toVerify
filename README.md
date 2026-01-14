@@ -1,124 +1,183 @@
 # toVerify - Trust, but Verify Your Commands
 
-A simple, powerful tool to ensure that a command-line program does exactly what you expect it to do—and nothing more.
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://img.shields.io/badge/tests-41%20passed-brightgreen.svg)]()
 
-## The Problem
+A simple, powerful tool to ensure that a command-line program does exactly what you expect—and nothing more.
 
-On a modern operating system, you trust dozens of programs every day, from `ls` and `grep` to complex toolchains and third-party utilities. But how can you be certain they are only performing the actions they're supposed to?
+## Features
 
-- Is that data processing script also making network connections?
-- Is a build tool reading files outside the project directory?
-- Has a trusted utility been compromised to do something malicious in the background?
+- 🔍 **Profile Mode**: Capture a command's syscalls, file access, and network activity
+- ✅ **Verify Mode**: Enforce behavior profiles in real-time, terminate on violation
+- 🧠 **Learning Mode**: Run N times and merge for stable profiles (reduces false positives)
+- 📊 **Diff Profiles**: Compare two profiles and see exactly what changed
+- 🔗 **Profile Inheritance**: Use `extends:` to inherit from base profiles
+- 🔎 **Validation**: Check profile syntax without running commands
+- 🔇 **Verbosity Control**: `--verbose` for debugging, `--quiet` for scripts
 
-Without deep inspection, you can't be sure. `toVerify` is designed to solve this problem by creating a behavioral "fingerprint" for a command and then ensuring the command never deviates from it.
+## Installation
 
-## The Solution
+```bash
+# From source
+git clone https://github.com/utkarsh/toVerify.git
+cd toVerify
+pip install -e .
 
-`toVerify` uses the powerful `strace` utility on Linux to monitor a program's system calls—the fundamental way a program interacts with the operating system. It provides two modes of operation:
-
-1.  **Profile Mode:** `toVerify` runs a command and records all of its system calls, file interactions, and network activity into a clear, human-readable **behavior profile** (a YAML file).
-2.  **Verify Mode:** `toVerify` runs a command against a pre-existing profile. If the command attempts any action that is not explicitly allowed in the profile, `toVerify` will immediately flag the deviation and terminate the process.
-
-This allows you to create a "contract" for any command and enforce it every time it runs.
-
-## Core Concepts
-
--   **Behavior Profile:** A YAML file that defines the "allowed" behavior of a command. This includes the set of permitted system calls, files that can be read or written to, and whether network access is allowed.
--   **Profiling:** The process of running a command to generate its initial behavior profile. This profile captures the command's actions during a known-good run.
--   **Verification:** The process of running a command against its profile. Any action outside the profile's defined scope is considered a violation.
-
-## Architecture
-
-`toVerify` is built on a simple yet powerful architecture:
-
-```
-  +------------------+     +--------------------------------+
-  | Command to Run   | --> | toVerify (Profiler/Verifier)   |
-  | (e.g., "ls -l")  |     +--------------------------------+
-  +------------------+       |           ^
-                             |           | (Reads Profile)
-                             v           |
-  +------------------+     +--------------------------------+
-  | strace           | --> | Behavior Profile (profile.yaml)|
-  | (System Calls)   |     +--------------------------------+
-  +------------------+
+# Or install with dev dependencies
+pip install -e ".[dev]"
 ```
 
-1.  **The Verifier** is the core engine that wraps the execution of the target command.
-2.  It uses **`strace`** to intercept and inspect system calls made by the command in real-time.
-3.  In **Profile Mode**, it generates a **Behavior Profile** from the `strace` output.
-4.  In **Verify Mode**, it compares the live system calls against the rules in an existing **Behavior Profile**.
+### Prerequisites
 
-## Usage
+- Linux (uses `strace`)
+- Python 3.8+
+- `strace` installed (`sudo apt install strace`)
 
-*(This is a conceptual example of how the tool would work.)*
+## Quick Start
 
 ### 1. Profile a Command
 
-First, create a behavior profile for a command you trust. Let's profile `ls -l /tmp`.
-
 ```bash
-# Run in profile mode to create ls_tmp.yaml
-toVerify --profile "ls -l /tmp" --output-file ls_tmp.yaml
-```
+# Single run profiling
+toVerify --profile "ls -l /tmp" -o ls_tmp.yaml
 
-This will execute the command and create a new file, `ls_tmp.yaml`, containing the observed behavior. You should inspect this file and can tighten the rules manually if needed.
-
-**Example `ls_tmp.yaml`:**
-```yaml
-# Behavior profile for command: ls -l /tmp
-command: "ls -l /tmp"
-allowed_syscalls:
-  - "execve"
-  - "access"
-  - "openat"
-  - "read"
-  - "write"
-  - "close"
-  - "brk"
-  - "mmap"
-file_access:
-  read:
-    - "/etc/ld.so.cache"
-    - "/lib/x86_64-linux-gnu/libc.so.6"
-    - "/tmp"
-  write:
-    - "/dev/stdout"
-network:
-  allowed: false
+# Learning mode: run 5 times, merge for stability
+toVerify --profile "ls -l /tmp" -o ls_tmp.yaml --learn 5
 ```
 
 ### 2. Verify a Command
 
-Now, you can run the command in verify mode. `toVerify` will ensure its behavior matches the profile.
-
 ```bash
-# Run in verify mode
-toVerify --verify ls_tmp.yaml --command "ls -l /tmp"
+# Strict verification (terminates on first violation)
+toVerify --verify ls_tmp.yaml -c "ls -l /tmp"
 
-# If the command runs as expected, it will execute silently.
+# Dry-run mode (report all violations without terminating)
+toVerify --verify ls_tmp.yaml -c "ls -l /tmp" --dry-run
 ```
 
-If the command deviates, `toVerify` will stop it and report the error. For example, if a compromised version of `ls` tried to open a network socket:
+### 3. Manage Profiles
 
 ```bash
-$ toVerify --verify ls_tmp.yaml --command "ls -l /tmp"
+# Validate profile syntax
+toVerify --validate ls_tmp.yaml -v
 
-CRITICAL: Deviation detected for command "ls -l /tmp"!
-Violation: System call "socket" is not allowed by profile "ls_tmp.yaml".
-Terminating process.
+# Compare two profiles
+toVerify --diff old_profile.yaml new_profile.yaml
 ```
 
-## Getting Started
+## Profile Format
 
-This project is in the conceptual phase. The next steps are to begin implementation of the profiler and verifier.
+```yaml
+command: "ls -l /tmp"
+allowed_syscalls:
+  - execve
+  - openat
+  - read
+  - write
+  - close
+file_access:
+  read:
+    - /etc/ld.so.*
+    - /lib/x86_64-linux-gnu/*
+    - /tmp
+  write:
+    - /dev/stdout
+network:
+  allowed: false
+```
 
-### Prerequisites
+### Profile Inheritance
 
--   A Linux environment
--   `strace` installed
--   A programming language for implementation (e.g., Python, Go, or Rust would be excellent choices)
+Create a base profile and extend it:
+
+```yaml
+# base-linux.yaml
+allowed_syscalls:
+  - execve
+  - brk
+  - mmap
+  - close
+file_access:
+  read:
+    - /etc/ld.so.*
+  write: []
+network:
+  allowed: false
+```
+
+```yaml
+# my-app.yaml
+extends: base-linux.yaml
+allowed_syscalls:
+  - openat
+  - read
+file_access:
+  read:
+    - /my/app/config
+```
+
+## CLI Reference
+
+```
+toVerify [OPTIONS]
+
+Modes (mutually exclusive):
+  --profile CMD          Profile a command and capture behavior
+  --verify PROFILE       Verify a command against a profile
+  --validate PROFILE     Check profile syntax
+  --diff PROF1 PROF2    Compare two profiles
+
+Options:
+  -o, --output-file FILE  Output file for profile (required with --profile)
+  -c, --command CMD       Command to verify (required with --verify)
+  -l, --learn N           Run N times and merge profiles
+  -t, --timeout SECONDS   Execution timeout (default: 300)
+  --dry-run               Report all violations without terminating
+  -v, --verbose           Show detailed syscall information
+  -q, --quiet             Suppress output except errors
+```
+
+## How It Works
+
+```
+┌─────────────────┐     ┌──────────────────────────┐
+│ Command to Run  │ ──▶ │      toVerify            │
+│ (e.g., ls -l)   │     │  Profiler / Verifier     │
+└─────────────────┘     └──────────────────────────┘
+                               │           ▲
+                               │           │ Reads Profile
+                               ▼           │
+┌─────────────────┐     ┌──────────────────────────┐
+│     strace      │ ──▶ │   Behavior Profile       │
+│ (System Calls)  │     │   (profile.yaml)         │
+└─────────────────┘     └──────────────────────────┘
+```
+
+1. `strace` intercepts syscalls from the command
+2. In **Profile Mode**: syscalls are recorded into a YAML profile
+3. In **Verify Mode**: syscalls are compared against the profile in real-time
+
+## Development
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Run with coverage
+pytest --cov=toVerify
+
+# Lint code
+ruff check src/
+```
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## Contributing
 
-This is the beginning of the project, and contributions are welcome. The immediate focus is on building the core profiler and verifier functionality.
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
