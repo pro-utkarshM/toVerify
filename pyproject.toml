@@ -1,9 +1,27 @@
 [project]
 name = "toVerify"
-version = "0.1.0"
-description = "A tool to verify command execution against a behavior profile."
+version = "0.2.0"
+description = "A tool to verify command execution against a behavior profile using strace."
 readme = "README.md"
-requires-python = ">=3.7"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+keywords = ["security", "strace", "syscall", "verification", "profiling"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: System :: Monitoring",
+]
 dependencies = [
     "PyYAML>=5.4",
 ]
@@ -11,8 +29,42 @@ dependencies = [
 [project.scripts]
 toVerify = "toVerify.__main__:main"
 
-[tool.setuptools]
-packages = ["toVerify"]
+[project.urls]
+Homepage = "https://github.com/utkarsh/toVerify"
+Documentation = "https://github.com/utkarsh/toVerify#readme"
+Repository = "https://github.com/utkarsh/toVerify.git"
+Issues = "https://github.com/utkarsh/toVerify/issues"
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+src = ["src"]
+line-length = 100
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_ignores = true

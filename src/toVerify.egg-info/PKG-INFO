@@ -1,12 +1,37 @@
 Metadata-Version: 2.4
 Name: toVerify
-Version: 0.1.0
-Summary: A tool to verify command execution against a behavior profile.
-Requires-Python: >=3.7
+Version: 0.2.0
+Summary: A tool to verify command execution against a behavior profile using strace.
+License: MIT
+Project-URL: Homepage, https://github.com/utkarsh/toVerify
+Project-URL: Documentation, https://github.com/utkarsh/toVerify#readme
+Project-URL: Repository, https://github.com/utkarsh/toVerify.git
+Project-URL: Issues, https://github.com/utkarsh/toVerify/issues
+Keywords: security,strace,syscall,verification,profiling
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: System Administrators
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Security
+Classifier: Topic :: System :: Monitoring
+Requires-Python: >=3.8
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: PyYAML>=5.4
 Provides-Extra: dev
-Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Dynamic: license-file
 
 # toVerify - Trust, but Verify Your Commands
 

@@ -1,0 +1,16 @@
+LICENSE
+README.md
+pyproject.toml
+src/toVerify/__init__.py
+src/toVerify/__main__.py
+src/toVerify/core.py
+src/toVerify/parser.py
+src/toVerify/profile.py
+src/toVerify.egg-info/PKG-INFO
+src/toVerify.egg-info/SOURCES.txt
+src/toVerify.egg-info/dependency_links.txt
+src/toVerify.egg-info/entry_points.txt
+src/toVerify.egg-info/requires.txt
+src/toVerify.egg-info/top_level.txt
+tests/test_core.py
+tests/test_parser.py

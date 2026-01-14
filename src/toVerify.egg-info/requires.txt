@@ -1,0 +1,7 @@
+PyYAML>=5.4
+
+[dev]
+pytest>=7.0
+pytest-cov
+ruff
+mypy
